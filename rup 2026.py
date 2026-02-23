@@ -479,10 +479,10 @@ with st.sidebar:
     st.markdown("---")
     st.caption(f"Telkomsel Enterprise\n{datetime.now():%d %B %Y}")
 
-# ── Filter: exclude E-Purchasing ──
+# ── Filter: hanya E-Purchasing ──
 df_f = df.copy()
 if "Metode" in df_f.columns:
-    df_f = df_f[~df_f["Metode"].str.contains("E-Purchasing", case=False, na=False)]
+    df_f = df_f[df_f["Metode"].str.contains("E-Purchasing", case=False, na=False)]
 
 if df_f.empty:
     st.warning("⚠️ Tidak ada data setelah filter E-Purchasing.")
