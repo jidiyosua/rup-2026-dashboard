@@ -477,32 +477,15 @@ with st.sidebar:
         st.stop()
     st.success(f"✅ **{fmt_n(len(df))}** paket dimuat")
     st.markdown("---")
-
-    st.markdown("### 📋 Filter")
-    if "Jenis_Pengadaan" in df.columns:
-        jp = sorted(df["Jenis_Pengadaan"].dropna().unique().tolist())
-        sel_jp = st.multiselect("Jenis Pengadaan", jp, jp, key="f_jp")
-    else:
-        sel_jp = []
-    if "Metode" in df.columns:
-        mt = sorted(df["Metode"].dropna().unique().tolist())
-        sel_mt = st.multiselect("Metode Pemilihan", mt, mt, key="f_mt")
-    else:
-        sel_mt = []
-
-    st.markdown("---")
     st.caption(f"Telkomsel Enterprise\n{datetime.now():%d %B %Y}")
 
-# ── Apply filters ──
-mask = pd.Series(True, index=df.index)
-if "Jenis_Pengadaan" in df.columns:
-    mask = mask & df["Jenis_Pengadaan"].isin(sel_jp)
-if "Metode" in df.columns:
-    mask = mask & df["Metode"].isin(sel_mt)
-df_f = df[mask].copy()
+# ── Filter: exclude E-Purchasing ──
+df_f = df.copy()
+if "Metode" in df_f.columns:
+    df_f = df_f[~df_f["Metode"].str.contains("E-Purchasing", case=False, na=False)]
 
 if df_f.empty:
-    st.warning("⚠️ Tidak ada data yang cocok dengan filter saat ini. Silakan ubah filter di sidebar.")
+    st.warning("⚠️ Tidak ada data setelah filter E-Purchasing.")
     st.stop()
 
 
