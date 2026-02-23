@@ -495,11 +495,15 @@ with st.sidebar:
 
 # ── Apply filters ──
 mask = pd.Series(True, index=df.index)
-if sel_jp and "Jenis_Pengadaan" in df.columns:
+if "Jenis_Pengadaan" in df.columns:
     mask = mask & df["Jenis_Pengadaan"].isin(sel_jp)
-if sel_mt and "Metode" in df.columns:
+if "Metode" in df.columns:
     mask = mask & df["Metode"].isin(sel_mt)
 df_f = df[mask].copy()
+
+if df_f.empty:
+    st.warning("⚠️ Tidak ada data yang cocok dengan filter saat ini. Silakan ubah filter di sidebar.")
+    st.stop()
 
 
 # ═══════════════════════════════════════════════════════════════════════════
