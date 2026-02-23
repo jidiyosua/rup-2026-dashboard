@@ -66,7 +66,7 @@ st.markdown("""
     .stDownloadButton>button { background:#1A1A2E!important;color:#FFF!important;
         font-weight:700!important;border-radius:10px!important;border:none!important; }
     .stDownloadButton>button:hover { background:#ED1C24!important; }
-    #MainMenu{visibility:hidden;}footer{visibility:hidden;}header{visibility:hidden;}
+    #MainMenu{visibility:hidden;}footer{visibility:hidden;}
 </style>
 """, unsafe_allow_html=True)
 
