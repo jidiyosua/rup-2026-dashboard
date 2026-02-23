@@ -172,6 +172,7 @@ def pie_chart(df_region, region_name):
       - Non-ICT = hijau tua (#1E6F3E)
       - Center: TOTAL pagu (sum) + jumlah paket semesta wilayah
       - Legend di bawah chart dengan info lengkap
+      - Menangani kasus: data kosong, hanya ICT, hanya Non-ICT
     """
     pagu_total = df_region["Pagu_Cleaned"].sum()   # TOTAL, bukan rata-rata
     paket_total = len(df_region)
@@ -190,11 +191,29 @@ def pie_chart(df_region, region_name):
     fig.patch.set_facecolor("#FFFFFF")
     ax.set_facecolor("#FFFFFF")
 
-    # ── Pie chart (donut style) ──
-    sizes = [pagu_ict, pagu_non]
-    colors = [C_ICT, C_NON]
-    labels_pie = ["ICT", "Non-ICT"]
+    # ── Kasus: tidak ada data sama sekali ──
+    if pagu_total == 0 or paket_total == 0:
+        ax.text(0.5, 0.5, "Tidak ada data\nuntuk filter ini",
+                ha="center", va="center", fontsize=14, color="#999999",
+                transform=ax.transAxes)
+        ax.axis("off")
+        return fig
 
+    # ── Siapkan data pie: hanya masukkan slice yang > 0 ──
+    sizes = []
+    colors = []
+    slice_labels = []
+
+    if pagu_ict > 0:
+        sizes.append(pagu_ict)
+        colors.append(C_ICT)
+        slice_labels.append(f"ICT — {fmt_rp(pagu_ict)}  ({pct_ict:.1f}%)  •  {fmt_n(paket_ict)} paket")
+    if pagu_non > 0:
+        sizes.append(pagu_non)
+        colors.append(C_NON)
+        slice_labels.append(f"Non-ICT — {fmt_rp(pagu_non)}  ({pct_non:.1f}%)  •  {fmt_n(paket_non)} paket")
+
+    # ── Pie chart (donut style) ──
     wedges, texts, autotexts = ax.pie(
         sizes, colors=colors,
         autopct=lambda pct: f"{pct:.1f}%",
@@ -219,12 +238,8 @@ def pie_chart(df_region, region_name):
             ha="center", va="center", fontsize=9, color="#666666")
 
     # ── Legend di bawah chart ──
-    legend_labels = [
-        f"ICT — {fmt_rp(pagu_ict)}  ({pct_ict:.1f}%)  •  {fmt_n(paket_ict)} paket",
-        f"Non-ICT — {fmt_rp(pagu_non)}  ({pct_non:.1f}%)  •  {fmt_n(paket_non)} paket",
-    ]
     legend = ax.legend(
-        wedges, legend_labels,
+        wedges, slice_labels,
         loc="lower center",
         bbox_to_anchor=(0.5, -0.12),
         fontsize=9,
