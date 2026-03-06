@@ -15,6 +15,7 @@ import matplotlib.ticker as mticker
 import textwrap
 import re
 import os
+import hashlib
 import numpy as np
 import gdown
 from datetime import datetime
@@ -33,6 +34,75 @@ st.set_page_config(
     page_title="Dashboard RUP 2026 — Jatim, Jabar, Makassar",
     page_icon="📊", layout="wide", initial_sidebar_state="expanded",
 )
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PASSWORD AUTHENTICATION
+# ═══════════════════════════════════════════════════════════════════════════
+# Cara generate hash baru:
+#   python -c "import hashlib; print(hashlib.sha256('PASSWORD_ANDA'.encode()).hexdigest())"
+#
+# Default password: "TelkomselEnterprise2025"
+
+def _hash(pw):
+    return hashlib.sha256(pw.encode()).hexdigest()
+
+def _get_valid_hash():
+    """Ambil hash dari st.secrets kalau ada, fallback ke hardcoded."""
+    try:
+        return st.secrets["auth"]["password_hash"]
+    except (KeyError, FileNotFoundError):
+        return hashlib.sha256("BidMgmt@Tsel2025".encode()).hexdigest()
+
+def check_password():
+    """Return True kalau user sudah login dengan password benar."""
+    if st.session_state.get("authenticated_rup"):
+        return True
+
+    # ── Login Form ──
+    st.markdown("""
+    <style>
+        .login-box { max-width:440px; margin:80px auto; background:#FFF;
+                     border-radius:20px; padding:48px 40px; text-align:center;
+                     box-shadow:0 8px 40px rgba(0,0,0,0.08);
+                     border-top:5px solid #ED1C24; }
+        .login-box h2 { color:#111!important; font-size:22px!important;
+                        font-weight:800!important; margin:16px 0 4px!important; }
+        .login-box p  { color:#888!important; font-size:13px!important; margin:0 0 24px!important; }
+        .login-logo   { font-size:48px; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class="login-box">
+        <div class="login-logo">🔒</div>
+        <h2>Telkomsel Enterprise</h2>
+        <p>Dashboard RUP 2026 — Potensi Pengadaan<br>Masukkan password untuk melanjutkan</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col_l, col_m, col_r = st.columns([1, 2, 1])
+    with col_m:
+        password = st.text_input("Password", type="password", key="login_pw_rup",
+                                 placeholder="Masukkan password...")
+        login_btn = st.button("🔐 Masuk", use_container_width=True, type="primary")
+
+        if login_btn:
+            if _hash(password) == _get_valid_hash():
+                st.session_state["authenticated_rup"] = True
+                st.rerun()
+            else:
+                st.error("❌ Password salah. Silakan coba lagi.")
+
+        st.markdown("<div style='text-align:center;margin-top:20px;'>"
+                    "<span style='color:#BBB;font-size:11px;'>"
+                    "Bid Management — Data Science | 2025</span></div>",
+                    unsafe_allow_html=True)
+
+    return False
+
+# ── Cek auth dulu, stop kalau belum login ──
+if not check_password():
+    st.stop()
 
 # ═══════════════════════════════════════════════════════════════════════════
 # CSS
@@ -163,18 +233,9 @@ def to_csv(df):
 
 # ═══════════════════════════════════════════════════════════════════════════
 # PIE CHART — ICT vs Non-ICT
-# Semesta = TOTAL pagu wilayah (dijumlahkan, bukan rata-rata)
 # ═══════════════════════════════════════════════════════════════════════════
 def pie_chart(df_region, region_name):
-    """
-    Donut-style Pie Chart:
-      - ICT  = biru tua (#1B4F72)
-      - Non-ICT = hijau tua (#1E6F3E)
-      - Center: TOTAL pagu (sum) + jumlah paket semesta wilayah
-      - Legend di bawah chart dengan info lengkap
-      - Menangani kasus: data kosong, hanya ICT, hanya Non-ICT
-    """
-    pagu_total = df_region["Pagu_Cleaned"].sum()   # TOTAL, bukan rata-rata
+    pagu_total = df_region["Pagu_Cleaned"].sum()
     paket_total = len(df_region)
     pagu_ict = df_region[df_region["Is_ICT"]]["Pagu_Cleaned"].sum()
     paket_ict = int(df_region["Is_ICT"].sum())
@@ -191,7 +252,6 @@ def pie_chart(df_region, region_name):
     fig.patch.set_facecolor("#FFFFFF")
     ax.set_facecolor("#FFFFFF")
 
-    # ── Kasus: tidak ada data sama sekali ──
     if pagu_total == 0 or paket_total == 0:
         ax.text(0.5, 0.5, "Tidak ada data\nuntuk filter ini",
                 ha="center", va="center", fontsize=14, color="#999999",
@@ -199,7 +259,6 @@ def pie_chart(df_region, region_name):
         ax.axis("off")
         return fig
 
-    # ── Siapkan data pie: hanya masukkan slice yang > 0 ──
     sizes = []
     colors = []
     slice_labels = []
@@ -213,7 +272,6 @@ def pie_chart(df_region, region_name):
         colors.append(C_NON)
         slice_labels.append(f"Non-ICT — {fmt_rp(pagu_non)}  ({pct_non:.1f}%)  •  {fmt_n(paket_non)} paket")
 
-    # ── Pie chart (donut style) ──
     wedges, texts, autotexts = ax.pie(
         sizes, colors=colors,
         autopct=lambda pct: f"{pct:.1f}%",
@@ -223,13 +281,11 @@ def pie_chart(df_region, region_name):
         textprops=dict(color="white", fontsize=12, fontweight="bold"),
     )
 
-    # Pastikan autopct text terlihat jelas
     for at in autotexts:
         at.set_fontsize(13)
         at.set_fontweight("bold")
         at.set_color("#FFFFFF")
 
-    # ── Center text: Total Pagu (SUM) ──
     ax.text(0, 0.06, fmt_rp(pagu_total),
             ha="center", va="center", fontsize=16, fontweight="bold", color="#111111")
     ax.text(0, -0.10, f"Total {region_name}",
@@ -237,7 +293,6 @@ def pie_chart(df_region, region_name):
     ax.text(0, -0.22, f"{fmt_n(paket_total)} paket",
             ha="center", va="center", fontsize=9, color="#666666")
 
-    # ── Legend di bawah chart ──
     legend = ax.legend(
         wedges, slice_labels,
         loc="lower center",
@@ -258,7 +313,7 @@ def pie_chart(df_region, region_name):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# HBAR — seaborn 0.12.x (no hue, no legend param)
+# HBAR
 # ═══════════════════════════════════════════════════════════════════════════
 def hbar(data, x_col, y_col, title, subtitle, colors, total_u=None, figsize=(14, 7)):
     sns.set_theme(style="white")
@@ -301,7 +356,6 @@ def hbar(data, x_col, y_col, title, subtitle, colors, total_u=None, figsize=(14,
 def render_detail(df_r, rname, key_pf):
     rp = df_r["Pagu_Cleaned"].sum()
 
-    # ── Top 10 K/L/PD ──
     st.markdown(f'<div class="sh"><h2>🏛️ Top 10 K/L/PD — {rname}</h2>'
                 f'<p>Instansi dengan rencana pengadaan terbesar</p></div>', unsafe_allow_html=True)
     if "K_L_PD" in df_r.columns:
@@ -328,7 +382,6 @@ def render_detail(df_r, rname, key_pf):
                     det.columns = ["Satuan Kerja", "Total Pagu", "Jml Paket"]
                     st.dataframe(det, use_container_width=True, hide_index=True)
 
-    # ── Top 10 Satuan Kerja ──
     st.markdown(f'<div class="sh"><h2>🏢 Top 10 Satuan Kerja — {rname}</h2>'
                 f'<p>Satker terbesar</p></div>', unsafe_allow_html=True)
     if "Satuan_Kerja" in df_r.columns:
@@ -342,7 +395,6 @@ def render_detail(df_r, rname, key_pf):
                        sns.color_palette("Oranges_r", 10), rp, figsize=(14, 6))
             st.pyplot(fig, use_container_width=True); plt.close(fig)
 
-    # ── Distribusi ──
     st.markdown(f'<div class="sh"><h2>📊 Distribusi — {rname}</h2>'
                 f'<p>Per jenis pengadaan dan metode</p></div>', unsafe_allow_html=True)
     ca, cb = st.columns(2)
@@ -365,7 +417,6 @@ def render_detail(df_r, rname, key_pf):
                            sns.color_palette("Purples_r", len(dm)), rp, figsize=(8, 4))
                 st.pyplot(fig, use_container_width=True); plt.close(fig)
 
-    # ── ICT Breakdown ──
     df_ict = df_r[df_r["Is_ICT"]]
     if len(df_ict) > 0:
         st.markdown(f'<div class="sh"><h2>💻 Breakdown Kategori ICT — {rname}</h2>'
@@ -382,14 +433,13 @@ def render_detail(df_r, rname, key_pf):
                        df_ict["Pagu_Cleaned"].sum(), figsize=(14, 5))
             st.pyplot(fig, use_container_width=True); plt.close(fig)
 
-    # ── Download CSV ──
     st.download_button(f"📥 Download CSV — {rname}", to_csv(df_r),
                        f"RUP2026_{rname.replace(' ','_')}_{datetime.now():%Y%m%d}.csv",
                        "text/csv", key=f"dl_{key_pf}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# LOAD DATA — langsung dari DB (data sudah difilter oleh user)
+# LOAD DATA
 # ═══════════════════════════════════════════════════════════════════════════
 @st.cache_data(ttl=3600)
 def load_data(db_path):
@@ -404,19 +454,16 @@ def load_data(db_path):
     df = pd.read_sql(f"SELECT * FROM [{tbl}]", conn)
     conn.close()
 
-    # ── Helper: bersihkan format angka Pagu ──
-    # Menangani kedua format: koma ribuan ('120,000,000') DAN titik ribuan ('120.000.000')
     def _clean_pagu_series(s):
         return (
             s.astype(str)
-             .str.replace(r'[Rr][Pp]\.?\s*', '', regex=True)   # hapus prefix "Rp"
-             .str.replace(r'[,\.](?=\d{3}(\D|$))', '', regex=True)  # hapus koma/titik pemisah ribuan
-             .str.replace(r'[^\d.]', '', regex=True)             # hapus karakter non-angka
+             .str.replace(r'[Rr][Pp]\.?\s*', '', regex=True)
+             .str.replace(r'[,\.](?=\d{3}(\D|$))', '', regex=True)
+             .str.replace(r'[^\d.]', '', regex=True)
              .pipe(pd.to_numeric, errors="coerce")
              .fillna(0)
         )
 
-    # Pagu — utamakan Pagu__Rp karena Pagu_Cleaned di DB bisa kosong (None)
     if "Pagu__Rp" in df.columns:
         df["Pagu_Cleaned"] = _clean_pagu_series(df["Pagu__Rp"])
     elif "Pagu_Rp" in df.columns:
@@ -426,7 +473,6 @@ def load_data(db_path):
     else:
         df["Pagu_Cleaned"] = 0
 
-    # Paket col
     pcol = None
     for c in ["Paket", "Nama_Paket"]:
         if c in df.columns: pcol = c; break
@@ -438,7 +484,6 @@ def load_data(db_path):
 
     df["Sektor"] = df["Is_ICT"].map({True: "ICT", False: "Non-ICT"})
 
-    # Region assign
     def assign_region(lok):
         if pd.isna(lok): return "Lainnya"
         up = str(lok).upper()
@@ -462,7 +507,6 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ── Sidebar ──
 with st.sidebar:
     st.markdown("## ⚙️ Konfigurasi")
     st.markdown("---")
@@ -477,9 +521,14 @@ with st.sidebar:
         st.stop()
     st.success(f"✅ **{fmt_n(len(df))}** paket dimuat")
     st.markdown("---")
+
+    # ── Logout button ──
+    if st.button("🚪 Logout", use_container_width=True):
+        st.session_state["authenticated_rup"] = False
+        st.rerun()
+
     st.caption(f"Telkomsel Enterprise\n{datetime.now():%d %B %Y}")
 
-# ── Filter: hanya E-Purchasing ──
 df_f = df.copy()
 if "Metode" in df_f.columns:
     df_f = df_f[df_f["Metode"].str.contains("E-Purchasing", case=False, na=False)]
@@ -490,7 +539,7 @@ if df_f.empty:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# HOMEPAGE — 3 PIE CHARTS (1 per wilayah)
+# HOMEPAGE — 3 PIE CHARTS
 # ═══════════════════════════════════════════════════════════════════════════
 
 st.markdown('<div class="sh"><h2>📊 Potensi Pengadaan per Wilayah — ICT vs Non-ICT</h2>'
@@ -508,19 +557,16 @@ for col, (rname, rinfo) in zip(cols, WILAYAH.items()):
         reg_pagu = df_reg["Pagu_Cleaned"].sum()
         reg_paket = len(df_reg)
 
-        # Region header card
         st.markdown(f"""
         <div class="rc" style="background:{rinfo['bg']};border-color:{rinfo['color']}">
             <h3 style="color:{rinfo['color']}!important">{rinfo['icon']} {rname}</h3>
             <p style="color:#333!important"><strong>{fmt_rp(reg_pagu)}</strong> | {fmt_n(reg_paket)} paket</p>
         </div>""", unsafe_allow_html=True)
 
-        # Pie chart ICT vs Non-ICT
         fig = pie_chart(df_reg, rname)
         st.pyplot(fig, use_container_width=True)
         plt.close(fig)
 
-        # Mini metrics
         c1, c2 = st.columns(2)
         with c1:
             st.markdown(mcard("K/L/PD",
